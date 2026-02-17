@@ -1,0 +1,16 @@
+{
+  "name": "whale-watcher-dashboard",
+  "version": "1.0.0",
+  "description": "Live market intelligence dashboard for Whale Watcher trading community",
+  "main": "src/worker.js",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "deploy:prod": "wrangler deploy --env production"
+  },
+  "author": "Rafael Garcia",
+  "license": "MIT",
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}
