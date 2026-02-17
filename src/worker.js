@@ -1,11 +1,29 @@
-// Whale Watcher Dashboard - Cloudflare Worker
-// Live market data dashboard with Finnhub API
+// Whale Watcher - Cloudflare Worker
+// Multi-page app: dashboard + user pages
 
 export default {
   async fetch(request, env) {
-    const FINNHUB_KEY = env.FINNHUB_API_KEY || '';
+    const url = new URL(request.url);
+    const path = url.pathname;
 
-    const html = `<!DOCTYPE html>
+    // Route handling — extend with more pages later
+    if (path === '/' || path.startsWith('/dashboard')) {
+      return dashboardPage(env);
+    }
+
+    // Future routes:
+    // if (path.startsWith('/profile')) return profilePage(env);
+    // if (path.startsWith('/settings')) return settingsPage(env);
+
+    // Fallback to dashboard
+    return dashboardPage(env);
+  },
+};
+
+function dashboardPage(env) {
+  const FINNHUB_KEY = env.FINNHUB_API_KEY || '';
+
+  const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -15,6 +33,8 @@ export default {
   <style>
     @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
     .fade-in { animation: fadeIn 0.3s ease-out; }
+    .spin { animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body class="bg-gray-900 text-white min-h-screen">
@@ -24,13 +44,19 @@ export default {
       <div class="flex items-center space-x-4">
         <h1 class="text-3xl font-bold">🐋 Whale Watcher</h1>
         <div class="flex items-center space-x-2">
-          <div class="w-2 h-2 bg-green-500 rounded-full animate-pulse" id="status-dot"></div>
-          <span class="text-sm text-green-400" id="status-text">Connecting...</span>
+          <div class="w-2 h-2 bg-gray-500 rounded-full" id="status-dot"></div>
+          <span class="text-sm text-gray-400" id="status-text">Ready</span>
         </div>
       </div>
-      <div class="text-right">
-        <div class="text-sm text-gray-400" id="last-update">--</div>
-        <div class="text-xs text-gray-500">Auto-refresh 30s</div>
+      <div class="flex items-center space-x-4">
+        <div class="text-right">
+          <div class="text-sm text-gray-400" id="last-update">Not loaded</div>
+        </div>
+        <button onclick="loadAll()" id="refresh-btn"
+          class="bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center space-x-2">
+          <span id="refresh-icon">🔄</span>
+          <span id="refresh-label">Refresh</span>
+        </button>
       </div>
     </div>
   </header>
@@ -39,22 +65,30 @@ export default {
     <!-- Market Overview -->
     <section>
       <h2 class="text-2xl font-bold mb-6 text-center">📊 Market Overview</h2>
-      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4" id="market-overview"></div>
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4" id="market-overview">
+        <div class="bg-gray-800 rounded-lg p-4 border border-gray-700 text-center text-gray-500 text-sm">Press Refresh to load</div>
+      </div>
     </section>
 
     <!-- Watchlists -->
     <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <div class="bg-gray-800 rounded-lg p-5">
         <h3 class="text-lg font-bold mb-4 text-blue-400">💻 Tech</h3>
-        <div class="space-y-2" id="tech-list"></div>
+        <div class="space-y-2" id="tech-list">
+          <div class="text-sm text-gray-500 text-center py-4">—</div>
+        </div>
       </div>
       <div class="bg-gray-800 rounded-lg p-5">
         <h3 class="text-lg font-bold mb-4 text-green-400">🛢️ Energy</h3>
-        <div class="space-y-2" id="energy-list"></div>
+        <div class="space-y-2" id="energy-list">
+          <div class="text-sm text-gray-500 text-center py-4">—</div>
+        </div>
       </div>
       <div class="bg-gray-800 rounded-lg p-5">
         <h3 class="text-lg font-bold mb-4 text-purple-400">🛡️ Defense</h3>
-        <div class="space-y-2" id="defense-list"></div>
+        <div class="space-y-2" id="defense-list">
+          <div class="text-sm text-gray-500 text-center py-4">—</div>
+        </div>
       </div>
     </section>
 
@@ -92,6 +126,7 @@ export default {
 
   <script>
     const API_KEY = '${FINNHUB_KEY}';
+    let isLoading = false;
 
     const WATCHLISTS = {
       market: ['SPY','QQQ','DIA','IWM'],
@@ -136,8 +171,19 @@ export default {
     }
 
     async function loadAll() {
+      if (isLoading) return;
+      isLoading = true;
+
       const dot = document.getElementById('status-dot');
       const txt = document.getElementById('status-text');
+      const btn = document.getElementById('refresh-btn');
+      const icon = document.getElementById('refresh-icon');
+      const label = document.getElementById('refresh-label');
+
+      btn.disabled = true;
+      btn.className = 'bg-gray-600 text-gray-300 px-4 py-2 rounded-lg text-sm font-medium flex items-center space-x-2 cursor-wait';
+      icon.innerHTML = '<svg class="w-4 h-4 spin inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 11-6.22-8.56"/></svg>';
+      label.textContent = 'Loading...';
       dot.className = 'w-2 h-2 bg-yellow-500 rounded-full animate-pulse';
       txt.textContent = 'Updating...';
       txt.className = 'text-sm text-yellow-400';
@@ -145,19 +191,14 @@ export default {
       try {
         const allSyms = [...new Set([...WATCHLISTS.market, ...WATCHLISTS.tech, ...WATCHLISTS.energy, ...WATCHLISTS.defense])];
         const results = {};
-        // Batch in groups of 5 to respect rate limits
         for (let i = 0; i < allSyms.length; i += 5) {
           const batch = allSyms.slice(i, i + 5);
-          const promises = batch.map(async s => { results[s] = await fetchQuote(s); });
-          await Promise.all(promises);
+          await Promise.all(batch.map(async s => { results[s] = await fetchQuote(s); }));
           if (i + 5 < allSyms.length) await new Promise(r => setTimeout(r, 200));
         }
 
-        // Render market overview
         document.getElementById('market-overview').innerHTML =
           WATCHLISTS.market.map(s => results[s] ? stockCard(s, results[s]) : '').join('');
-
-        // Render watchlists
         document.getElementById('tech-list').innerHTML =
           WATCHLISTS.tech.map(s => results[s] ? stockRow(s, results[s]) : '').join('');
         document.getElementById('energy-list').innerHTML =
@@ -165,8 +206,8 @@ export default {
         document.getElementById('defense-list').innerHTML =
           WATCHLISTS.defense.map(s => results[s] ? stockRow(s, results[s]) : '').join('');
 
-        dot.className = 'w-2 h-2 bg-green-500 rounded-full animate-pulse';
-        txt.textContent = 'Live';
+        dot.className = 'w-2 h-2 bg-green-500 rounded-full';
+        txt.textContent = 'Updated';
         txt.className = 'text-sm text-green-400';
         document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
       } catch (e) {
@@ -174,21 +215,23 @@ export default {
         txt.textContent = 'Error';
         txt.className = 'text-sm text-red-400';
       }
-    }
 
-    loadAll();
-    setInterval(loadAll, 30000);
+      btn.disabled = false;
+      btn.className = 'bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center space-x-2';
+      icon.textContent = '🔄';
+      label.textContent = 'Refresh';
+      isLoading = false;
+    }
   </script>
 </body>
 </html>`;
 
-    return new Response(html, {
-      headers: {
-        'Content-Type': 'text/html;charset=UTF-8',
-        'Cache-Control': 'no-cache',
-        'X-Content-Type-Options': 'nosniff',
-        'X-Frame-Options': 'DENY',
-      },
-    });
-  },
-};
+  return new Response(html, {
+    headers: {
+      'Content-Type': 'text/html;charset=UTF-8',
+      'Cache-Control': 'no-cache',
+      'X-Content-Type-Options': 'nosniff',
+      'X-Frame-Options': 'DENY',
+    },
+  });
+}
