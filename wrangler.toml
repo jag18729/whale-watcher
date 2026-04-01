@@ -1,8 +1,18 @@
 name = "whale-watcher-dashboard"
 main = "src/worker.js"
-compatibility_date = "2024-01-01"
+compatibility_date = "2025-01-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "network-metrics"
+database_id = "2517cc0c-539c-436a-9bba-709dd657936e"
 
 [env.production]
 routes = [
   { pattern = "ww.vandine.us/*", zone_name = "vandine.us" }
 ]
+
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "network-metrics"
+database_id = "2517cc0c-539c-436a-9bba-709dd657936e"
