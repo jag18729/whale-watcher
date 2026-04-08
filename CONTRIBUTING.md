@@ -9,8 +9,8 @@ Be respectful. Disagree with ideas, not people. Assume good faith.
 ## Development setup
 
 ```bash
-git clone https://github.com/jag18729/whale-watcher-dashboard.git
-cd whale-watcher-dashboard
+git clone https://github.com/jag18729/whale-watcher.git
+cd whale-watcher
 npm install
 cp .env.example .dev.vars
 # Fill in .dev.vars with development credentials

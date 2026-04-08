@@ -16,8 +16,8 @@ This document covers the full deployment of Whale Watcher to a fresh Cloudflare 
 ### 1. Clone and install
 
 ```bash
-git clone https://github.com/jag18729/whale-watcher-dashboard.git
-cd whale-watcher-dashboard
+git clone https://github.com/jag18729/whale-watcher.git
+cd whale-watcher
 npm install
 ```
 

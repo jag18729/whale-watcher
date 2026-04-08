@@ -44,5 +44,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Resend webhook ingestion for delivery, open, and click events.
 - Finnhub-powered market dashboard at `/`.
 
-[2.0.0]: https://github.com/jag18729/whale-watcher-dashboard/releases/tag/v2.0.0
-[1.0.0]: https://github.com/jag18729/whale-watcher-dashboard/releases/tag/v1.0.0
+[2.0.0]: https://github.com/jag18729/whale-watcher/releases/tag/v2.0.0
+[1.0.0]: https://github.com/jag18729/whale-watcher/releases/tag/v1.0.0

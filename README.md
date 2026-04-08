@@ -4,7 +4,7 @@ A personalized morning brief newsletter for self-directed investors. Each subscr
 
 Built as a single Cloudflare Worker. Scheduling, data collection, rendering, and delivery all run on Cloudflare's edge.
 
-[![Deploy](https://github.com/jag18729/whale-watcher-dashboard/actions/workflows/deploy.yml/badge.svg?branch=master)](https://github.com/jag18729/whale-watcher-dashboard/actions/workflows/deploy.yml)
+[![Deploy](https://github.com/jag18729/whale-watcher/actions/workflows/deploy.yml/badge.svg?branch=master)](https://github.com/jag18729/whale-watcher/actions/workflows/deploy.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Cloudflare Workers](https://img.shields.io/badge/Cloudflare-Workers-F38020?logo=cloudflare&logoColor=white)](https://workers.cloudflare.com/)
 [![D1](https://img.shields.io/badge/Cloudflare-D1-F38020?logo=cloudflare&logoColor=white)](https://developers.cloudflare.com/d1/)
@@ -81,8 +81,8 @@ The same `runMorningBrief` function backs the HTTP endpoint `GET /api/run-mornin
 ## Quick start
 
 ```bash
-git clone https://github.com/jag18729/whale-watcher-dashboard.git
-cd whale-watcher-dashboard
+git clone https://github.com/jag18729/whale-watcher.git
+cd whale-watcher
 npm install
 
 # Create your D1 database and capture the database_id

@@ -1,5 +1,5 @@
 {
-  "name": "whale-watcher-dashboard",
+  "name": "whale-watcher",
   "version": "2.0.0",
   "description": "Personalized morning brief newsletter for self-directed investors. Cloudflare Workers + D1 + Resend.",
   "main": "src/worker.js",
@@ -28,13 +28,13 @@
   ],
   "author": "Rafael Garcia",
   "license": "MIT",
-  "homepage": "https://github.com/jag18729/whale-watcher-dashboard#readme",
+  "homepage": "https://github.com/jag18729/whale-watcher#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/jag18729/whale-watcher-dashboard.git"
+    "url": "git+https://github.com/jag18729/whale-watcher.git"
   },
   "bugs": {
-    "url": "https://github.com/jag18729/whale-watcher-dashboard/issues"
+    "url": "https://github.com/jag18729/whale-watcher/issues"
   },
   "dependencies": {
     "hono": "^4.0.0"
