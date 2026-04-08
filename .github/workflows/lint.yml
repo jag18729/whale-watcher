@@ -1,0 +1,37 @@
+name: Lint
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+
+jobs:
+  lint:
+    name: Validate Worker
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate wrangler.toml
+        run: npx wrangler deploy --dry-run --env production --outdir /tmp/dry-run
+        env:
+          CLOUDFLARE_API_TOKEN: dry-run
+          CLOUDFLARE_ACCOUNT_ID: dry-run
+
+      - name: Check for syntax errors
+        run: node --check src/worker.js
