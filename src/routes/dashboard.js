@@ -1,8 +1,8 @@
-// Extracted dashboard page - original Finnhub market viewer
+// Extracted dashboard page - market viewer.
+// Quotes are fetched from /api/quotes (server-side proxy over Yahoo Finance) so no
+// upstream API key is exposed to the browser.
 
 export function dashboardPage(env) {
-  const FINNHUB_KEY = env.FINNHUB_API_KEY || '';
-
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -62,11 +62,10 @@ export function dashboardPage(env) {
     </section>
     <div class="text-center text-xs text-gray-500 pb-4">
       <p>Not financial advice. DYOR.</p>
-      <p class="mt-1">Data: Finnhub</p>
+      <p class="mt-1">Data: Yahoo Finance</p>
     </div>
   </div>
   <script>
-    const API_KEY = '${FINNHUB_KEY}';
     let isLoading = false;
     const WATCHLISTS = {
       market: ['SPY','QQQ','DIA','IWM'],
@@ -85,8 +84,13 @@ export function dashboardPage(env) {
       const up = d >= 0, color = up ? 'text-green-400' : 'text-red-400', sign = up ? '+' : '';
       return '<div class="flex justify-between items-center py-2 border-b border-gray-700/50 fade-in"><span class="font-mono font-bold text-sm">' + sym + '</span><div class="text-right"><div class="text-sm font-bold">$' + c.toFixed(2) + '</div><div class="text-xs ' + color + '">' + sign + dp.toFixed(2) + '%</div></div></div>';
     }
-    async function fetchQuote(sym) {
-      try { const r = await fetch('https://finnhub.io/api/v1/quote?symbol=' + sym + '&token=' + API_KEY); if (!r.ok) return null; return await r.json(); } catch { return null; }
+    async function fetchQuotes(syms) {
+      try {
+        const r = await fetch('/api/quotes?symbols=' + encodeURIComponent(syms.join(',')));
+        if (!r.ok) return {};
+        const j = await r.json();
+        return j.quotes || {};
+      } catch { return {}; }
     }
     async function loadAll() {
       if (isLoading) return; isLoading = true;
@@ -98,16 +102,12 @@ export function dashboardPage(env) {
       txt.textContent = 'Updating...'; txt.className = 'text-sm text-yellow-400';
       try {
         const allSyms = [...new Set([...WATCHLISTS.market, ...WATCHLISTS.tech, ...WATCHLISTS.energy, ...WATCHLISTS.defense])];
-        const results = {};
-        for (let i = 0; i < allSyms.length; i += 5) {
-          const batch = allSyms.slice(i, i + 5);
-          await Promise.all(batch.map(async s => { results[s] = await fetchQuote(s); }));
-          if (i + 5 < allSyms.length) await new Promise(r => setTimeout(r, 200));
-        }
-        document.getElementById('market-overview').innerHTML = WATCHLISTS.market.map(s => results[s] ? stockCard(s, results[s]) : '').join('');
-        document.getElementById('tech-list').innerHTML = WATCHLISTS.tech.map(s => results[s] ? stockRow(s, results[s]) : '').join('');
-        document.getElementById('energy-list').innerHTML = WATCHLISTS.energy.map(s => results[s] ? stockRow(s, results[s]) : '').join('');
-        document.getElementById('defense-list').innerHTML = WATCHLISTS.defense.map(s => results[s] ? stockRow(s, results[s]) : '').join('');
+        const results = await fetchQuotes(allSyms);
+        const safe = sym => results[sym] && results[sym].c != null;
+        document.getElementById('market-overview').innerHTML = WATCHLISTS.market.map(s => safe(s) ? stockCard(s, results[s]) : '').join('');
+        document.getElementById('tech-list').innerHTML = WATCHLISTS.tech.map(s => safe(s) ? stockRow(s, results[s]) : '').join('');
+        document.getElementById('energy-list').innerHTML = WATCHLISTS.energy.map(s => safe(s) ? stockRow(s, results[s]) : '').join('');
+        document.getElementById('defense-list').innerHTML = WATCHLISTS.defense.map(s => safe(s) ? stockRow(s, results[s]) : '').join('');
         dot.className = 'w-2 h-2 bg-green-500 rounded-full'; txt.textContent = 'Updated'; txt.className = 'text-sm text-green-400';
         document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
       } catch (e) { dot.className = 'w-2 h-2 bg-red-500 rounded-full'; txt.textContent = 'Error'; txt.className = 'text-sm text-red-400'; }
@@ -119,6 +119,12 @@ export function dashboardPage(env) {
 </html>`;
 
   return new Response(html, {
-    headers: { 'Content-Type': 'text/html;charset=UTF-8', 'Cache-Control': 'no-cache', 'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'DENY' },
+    headers: {
+      'Content-Type': 'text/html;charset=UTF-8',
+      'Cache-Control': 'no-cache',
+      'X-Content-Type-Options': 'nosniff',
+      'X-Frame-Options': 'DENY',
+      'Referrer-Policy': 'no-referrer',
+    },
   });
 }

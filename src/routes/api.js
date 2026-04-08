@@ -243,7 +243,7 @@ api.post('/send-email', apiKeyAuth(), async (c) => {
 //   2. /api/research-summary?date=...   -> returns ~3KB compact JSON the agent can hold in context
 // The agent then crafts the brief from the summary and POSTs via /api/compile-and-send.
 
-async function fetchYahooPrice(ticker) {
+export async function fetchYahooPrice(ticker) {
   // Yahoo Finance maps crypto symbols as e.g. BTC-USD; map known ones.
   const yahooSym = ({ BTC: 'BTC-USD', ETH: 'ETH-USD' })[ticker] || ticker;
   try {
@@ -253,24 +253,25 @@ async function fetchYahooPrice(ticker) {
         'Accept': 'application/json',
       },
     });
-    if (!r.ok) return { ticker, price: null, change_pct: null, error: `HTTP ${r.status}` };
+    if (!r.ok) return { ticker, price: null, change: null, change_pct: null, error: `HTTP ${r.status}` };
     const j = await r.json();
     const result = j?.chart?.result?.[0];
     const meta = result?.meta;
-    if (!meta) return { ticker, price: null, change_pct: null };
+    if (!meta) return { ticker, price: null, change: null, change_pct: null };
     const price = meta.regularMarketPrice ?? null;
     // previousClose can be null on Yahoo; fall back to the previous day's close from the series
     const closes = result?.indicators?.quote?.[0]?.close || [];
     const seriesPrev = closes.length >= 2 ? closes[closes.length - 2] : null;
     const prev = meta.previousClose ?? meta.chartPreviousClose ?? seriesPrev ?? null;
+    const change = (price != null && prev) ? +(price - prev).toFixed(2) : null;
     const change_pct = (price != null && prev) ? +(((price - prev) / prev) * 100).toFixed(2) : null;
-    return { ticker, price, change_pct };
+    return { ticker, price, change, change_pct };
   } catch (err) {
-    return { ticker, price: null, change_pct: null, error: err.message };
+    return { ticker, price: null, change: null, change_pct: null, error: err.message };
   }
 }
 
-async function braveSearch(query, apiKey) {
+export async function braveSearch(query, apiKey) {
   if (!apiKey) return { query, results: [], error: 'no api key' };
   try {
     const r = await fetch(`https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=3`, {
@@ -515,6 +516,30 @@ api.get('/run-morning-brief', apiKeyAuth(), async (c) => {
   const date = c.req.query('date') || new Date().toISOString().slice(0, 10);
   const result = await runMorningBrief(c.env, date);
   return c.json(result);
+});
+
+// Server-side proxy for live quotes. Backed by the same fetchYahooPrice helper
+// that powers runMorningBrief, so the dashboard and the cron read identical data.
+// Public (no API key) because the upstream Yahoo Finance chart endpoint is itself
+// public and unauthenticated. Capped at 50 symbols per request as basic abuse limit.
+// Returns { quotes: { SYMBOL: { c, d, dp } } } in Finnhub-compatible shape so the
+// existing dashboard rendering code can consume it without translation.
+api.get('/quotes', async (c) => {
+  const symbolsParam = c.req.query('symbols') || '';
+  const symbols = symbolsParam.split(',').map(s => s.trim().toUpperCase()).filter(Boolean).slice(0, 50);
+  if (!symbols.length) {
+    return c.json({ error: 'Required: ?symbols=AAPL,MSFT' }, 400);
+  }
+  const results = await Promise.all(symbols.map(fetchYahooPrice));
+  const quotes = {};
+  for (const r of results) {
+    quotes[r.ticker] = {
+      c: r.price,
+      d: r.change,
+      dp: r.change_pct,
+    };
+  }
+  return c.json({ quotes });
 });
 
 api.get('/health', (c) => c.json({ status: 'ok', service: 'whale-watcher' }));
