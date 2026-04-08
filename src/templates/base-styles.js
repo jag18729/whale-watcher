@@ -328,6 +328,79 @@ export function baseStyles() {
     color: var(--tide);
   }
 
+  /* ==========  Masthead, plate, footer  ========== */
+  .ww-masthead {
+    padding: 3rem 0 1rem;
+  }
+  .ww-masthead .ww-display {
+    font-size: clamp(2.75rem, 9vw, 5rem);
+    font-weight: 900;
+    font-variation-settings: "opsz" 144, "SOFT" 30;
+    letter-spacing: -0.025em;
+    margin-top: 0.4rem;
+  }
+  .ww-masthead .ww-caption { display: block; }
+
+  .ww-plate {
+    padding: 2rem 0 1.5rem;
+  }
+  .ww-plate__head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+  .ww-plate__head .ww-caption { white-space: nowrap; }
+  .ww-plate__title {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: clamp(1.6rem, 4vw, 2.25rem);
+    margin: 0;
+    line-height: 1.1;
+  }
+
+  .ww-pod-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 0.6rem;
+    margin: 1rem 0 1.5rem;
+  }
+  .ww-pod-add {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-end;
+  }
+  .ww-pod-add .ww-input { flex: 1; min-width: 0; max-width: 14rem; }
+
+  .ww-footer {
+    padding: 3rem 0 6rem;
+    text-align: center;
+    border-top: var(--rule);
+    margin-top: 2rem;
+  }
+  .ww-footer .ww-caption { display: block; margin-bottom: 0.6rem; color: color-mix(in srgb, var(--tide) 80%, transparent); }
+  .ww-disclaimer {
+    font-family: var(--font-body);
+    font-style: italic;
+    font-size: 0.85rem;
+    color: color-mix(in srgb, var(--ink) 50%, transparent);
+    margin: 0;
+  }
+
+  /* ==========  Status / save flash  ========== */
+  .ww-flash {
+    font-family: var(--font-display);
+    font-feature-settings: "smcp";
+    text-transform: lowercase;
+    letter-spacing: 0.16em;
+    font-size: 0.78rem;
+    color: var(--tide);
+    transition: color var(--m-button);
+  }
+  .ww-flash[data-tone="ok"]   { color: var(--kelp); }
+  .ww-flash[data-tone="warn"] { color: var(--rust); }
+
   /* ==========  Reduced motion  ========== */
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
