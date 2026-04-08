@@ -12,7 +12,7 @@ Each migration is a numbered SQL file. The current cumulative state is mirrored 
 ## Apply
 
 ```bash
-npx wrangler d1 execute whale-watcher --remote --file=src/db/migrations/000N_name.sql
+bunx wrangler d1 execute whale-watcher --remote --file=src/db/migrations/000N_name.sql
 ```
 
 ## Convention

@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- Toolchain migrated from Node 20 + npm to Bun 1.3+. `package.json` now declares `engines.bun >=1.3` and `packageManager: bun@1.3.9`. Lockfile is `bun.lock` (text format, reviewable diffs).
+- GitHub Actions workflows use `oven-sh/setup-bun@v2` and `bun install --frozen-lockfile` instead of `actions/setup-node` and `npm ci`. The Cloudflare Wrangler action is invoked with `packageManager: bun`.
+- All documentation (README, CONTRIBUTING, docs/DEPLOY.md, src/db/migrations/README.md) updated to use `bun install`, `bun run`, and `bunx wrangler` instead of the npm equivalents.
+- The `check` script now runs `wrangler deploy --dry-run` (the canonical validator) instead of `node --check`, since Bun does not ship a Node-style file syntax check.
+
+### Removed
+- `package-lock.json` (replaced by `bun.lock`).
+- `.nvmrc` (Bun is now the only required runtime tool).
+- `node` and `npm` references in CI and docs.
+
 ## [2.0.0] - 2026-04-08
 
 ### Changed

@@ -80,29 +80,31 @@ The same `runMorningBrief` function backs the HTTP endpoint `GET /api/run-mornin
 
 ## Quick start
 
+Requires [Bun](https://bun.sh) 1.3 or newer (`curl -fsSL https://bun.sh/install | bash`).
+
 ```bash
 git clone https://github.com/jag18729/whale-watcher.git
 cd whale-watcher
-npm install
+bun install
 
 # Create your D1 database and capture the database_id
-npx wrangler d1 create whale-watcher
+bunx wrangler d1 create whale-watcher
 
 # Edit wrangler.toml: replace database_id with the value from the previous step
 # Apply schema
-npx wrangler d1 execute whale-watcher --remote --file=src/db/schema.sql
+bunx wrangler d1 execute whale-watcher --remote --file=src/db/schema.sql
 
 # Edit src/db/seed.sql with your subscribers, then seed
-npx wrangler d1 execute whale-watcher --remote --file=src/db/seed.sql
+bunx wrangler d1 execute whale-watcher --remote --file=src/db/seed.sql
 
 # Configure secrets (interactive)
-npx wrangler secret put AGENT_API_KEY     --env production
-npx wrangler secret put RESEND_API_KEY    --env production
-npx wrangler secret put BRAVE_API_KEY     --env production
-npx wrangler secret put FINNHUB_API_KEY   --env production  # optional, dashboard only
+bunx wrangler secret put AGENT_API_KEY     --env production
+bunx wrangler secret put RESEND_API_KEY    --env production
+bunx wrangler secret put BRAVE_API_KEY     --env production
+bunx wrangler secret put FINNHUB_API_KEY   --env production  # optional, dashboard only
 
 # Deploy
-npm run deploy
+bun run deploy
 ```
 
 The cron triggers in `wrangler.toml` will start firing on the next scheduled boundary. To verify the pipeline immediately without waiting for the next 06:00 PT, hit the HTTP endpoint:
@@ -118,7 +120,7 @@ Full deployment guide: [docs/DEPLOY.md](docs/DEPLOY.md).
 ```bash
 cp .env.example .dev.vars
 # Fill in .dev.vars with real keys (it is gitignored)
-npm run dev
+bun run dev
 ```
 
 `wrangler dev` proxies the local Worker to a tunnel and binds your remote D1 database for development.
@@ -126,7 +128,7 @@ npm run dev
 To test the scheduled handler locally:
 
 ```bash
-npm run dev -- --test-scheduled
+bun run dev -- --test-scheduled
 # Then in another shell:
 curl "http://localhost:8787/__scheduled?cron=0+13+*+*+1-5"
 ```

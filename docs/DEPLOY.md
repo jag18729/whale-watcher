@@ -6,7 +6,7 @@ This document covers the full deployment of Whale Watcher to a fresh Cloudflare 
 
 - A Cloudflare account with Workers enabled
 - A registered domain on Cloudflare (or a free `*.workers.dev` subdomain)
-- Node.js 20 or newer
+- [Bun](https://bun.sh) 1.3 or newer (`curl -fsSL https://bun.sh/install | bash`)
 - A Resend account with a verified sending domain
 - A Brave Search API key (free tier is fine: 1 req/sec, 2000/month)
 - Optional: a Finnhub API key for the public dashboard at `/`
@@ -18,13 +18,13 @@ This document covers the full deployment of Whale Watcher to a fresh Cloudflare 
 ```bash
 git clone https://github.com/jag18729/whale-watcher.git
 cd whale-watcher
-npm install
+bun install
 ```
 
 ### 2. Authenticate Wrangler
 
 ```bash
-npx wrangler login
+bunx wrangler login
 ```
 
 This opens a browser for OAuth. The token is stored under `~/.wrangler` and is per-machine.
@@ -32,7 +32,7 @@ This opens a browser for OAuth. The token is stored under `~/.wrangler` and is p
 ### 3. Create the D1 database
 
 ```bash
-npx wrangler d1 create whale-watcher
+bunx wrangler d1 create whale-watcher
 ```
 
 The output includes a `database_id`. Copy it.
@@ -46,13 +46,13 @@ If you are using your own domain, also update the `routes` block under `[env.pro
 ### 5. Apply the schema
 
 ```bash
-npx wrangler d1 execute whale-watcher --remote --file=src/db/schema.sql
+bunx wrangler d1 execute whale-watcher --remote --file=src/db/schema.sql
 ```
 
 Verify with:
 
 ```bash
-npx wrangler d1 execute whale-watcher --remote \
+bunx wrangler d1 execute whale-watcher --remote \
   --command "SELECT name FROM sqlite_master WHERE type='table'"
 ```
 
@@ -63,22 +63,22 @@ You should see `users`, `pod_tickers`, `briefs`, `watches`, `feedback`, `pod_req
 Edit `src/db/seed.sql` with your subscribers. Each user needs a unique long random `token` (32 hex characters is fine):
 
 ```bash
-node -e "console.log(require('crypto').randomBytes(16).toString('hex'))"
+bun -e "console.log(crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '').slice(0, 0))"
 ```
 
 Then apply:
 
 ```bash
-npx wrangler d1 execute whale-watcher --remote --file=src/db/seed.sql
+bunx wrangler d1 execute whale-watcher --remote --file=src/db/seed.sql
 ```
 
 ### 7. Set Worker secrets
 
 ```bash
-npx wrangler secret put AGENT_API_KEY    --env production
-npx wrangler secret put RESEND_API_KEY   --env production
-npx wrangler secret put BRAVE_API_KEY    --env production
-npx wrangler secret put FINNHUB_API_KEY  --env production    # optional
+bunx wrangler secret put AGENT_API_KEY    --env production
+bunx wrangler secret put RESEND_API_KEY   --env production
+bunx wrangler secret put BRAVE_API_KEY    --env production
+bunx wrangler secret put FINNHUB_API_KEY  --env production    # optional
 ```
 
 `AGENT_API_KEY` is a shared secret you choose. `RESEND_API_KEY` comes from your Resend dashboard. `BRAVE_API_KEY` from the Brave Search API portal.
@@ -86,7 +86,7 @@ npx wrangler secret put FINNHUB_API_KEY  --env production    # optional
 ### 8. Deploy
 
 ```bash
-npm run deploy
+bun run deploy
 ```
 
 The output should include your route binding and the cron schedules:
@@ -128,7 +128,7 @@ curl "https://ww.vandine.us/api/run-morning-brief?key=$AGENT_API_KEY&date=2026-0
 ### Inspect the schedule
 
 ```bash
-npx wrangler triggers deploy --env production
+bunx wrangler triggers deploy --env production
 ```
 
 This is idempotent and prints the current trigger configuration. Cron triggers are also visible in the Cloudflare dashboard under Workers and Pages -> your worker -> Triggers.
@@ -136,22 +136,22 @@ This is idempotent and prints the current trigger configuration. Cron triggers a
 ### Tail Worker logs
 
 ```bash
-npx wrangler tail --env production
+bunx wrangler tail --env production
 ```
 
 ### Inspect D1
 
 ```bash
 # Recent briefs
-npx wrangler d1 execute whale-watcher --remote \
+bunx wrangler d1 execute whale-watcher --remote \
   --command "SELECT user_id, brief_date, subject, resend_id FROM briefs ORDER BY created_at DESC LIMIT 10"
 
 # Today's research cache
-npx wrangler d1 execute whale-watcher --remote \
+bunx wrangler d1 execute whale-watcher --remote \
   --command "SELECT section, length(data) as bytes FROM research_cache WHERE cache_date = date('now')"
 
 # Pending pod requests
-npx wrangler d1 execute whale-watcher --remote \
+bunx wrangler d1 execute whale-watcher --remote \
   --command "SELECT user_id, ticker, action, created_at FROM pod_requests WHERE processed = 0"
 ```
 
@@ -159,7 +159,7 @@ npx wrangler d1 execute whale-watcher --remote \
 
 ```bash
 # Add
-npx wrangler d1 execute whale-watcher --remote --command "
+bunx wrangler d1 execute whale-watcher --remote --command "
 INSERT INTO users (id, email, name, token) VALUES
   ('u_alice', 'alice@example.com', 'Alice', 'a1b2c3d4e5f6...');
 
@@ -169,14 +169,14 @@ INSERT INTO pod_tickers (id, user_id, ticker, sector) VALUES
 "
 
 # Disable
-npx wrangler d1 execute whale-watcher --remote \
+bunx wrangler d1 execute whale-watcher --remote \
   --command "UPDATE users SET active = 0 WHERE id = 'u_alice'"
 ```
 
 ### Apply a migration
 
 ```bash
-npx wrangler d1 execute whale-watcher --remote \
+bunx wrangler d1 execute whale-watcher --remote \
   --file=src/db/migrations/0003_add_alerts.sql
 ```
 
@@ -191,10 +191,10 @@ Cloudflare keeps the previous version. From the dashboard, navigate to Workers a
 ### The morning brief did not arrive
 
 1. Check the Cloudflare dashboard for the worker. Under Triggers, verify both cron schedules are present and enabled.
-2. Tail the logs: `npx wrangler tail --env production` and trigger manually.
+2. Tail the logs: `bunx wrangler tail --env production` and trigger manually.
 3. Check D1 for a brief row for today: `SELECT * FROM briefs WHERE brief_date = date('now')`.
 4. Check Resend for delivery status. If the email reached Resend but bounced, the issue is in the upstream mailbox.
-5. If D1 has no row for today, the cron handler did not run. Confirm the schedule has not been removed. Re-deploy with `npm run deploy` to re-register triggers.
+5. If D1 has no row for today, the cron handler did not run. Confirm the schedule has not been removed. Re-deploy with `bun run deploy` to re-register triggers.
 
 ### Yahoo Finance returns null prices
 

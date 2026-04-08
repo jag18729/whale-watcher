@@ -11,15 +11,15 @@ Be respectful. Disagree with ideas, not people. Assume good faith.
 ```bash
 git clone https://github.com/jag18729/whale-watcher.git
 cd whale-watcher
-npm install
+bun install
 cp .env.example .dev.vars
 # Fill in .dev.vars with development credentials
-npm run dev
+bun run dev
 ```
 
 You will need:
 
-- Node.js 20 or newer
+- [Bun](https://bun.sh) 1.3 or newer
 - A Cloudflare account with Workers and D1 enabled
 - A Resend account with a verified sending domain
 - A Brave Search API key (free tier is sufficient)
@@ -29,7 +29,7 @@ You will need:
 ## Running the scheduled handler locally
 
 ```bash
-npm run dev -- --test-scheduled
+bun run dev -- --test-scheduled
 # In a separate terminal:
 curl "http://localhost:8787/__scheduled?cron=0+13+*+*+1-5"
 ```
@@ -63,7 +63,7 @@ src/db/migrations/
 Apply with:
 
 ```bash
-npx wrangler d1 execute whale-watcher --remote --file=src/db/migrations/0002_add_research_cache.sql
+bunx wrangler d1 execute whale-watcher --remote --file=src/db/migrations/0002_add_research_cache.sql
 ```
 
 Update `src/db/schema.sql` to reflect the cumulative current state. Update `src/db/queries.js` if the change introduces new accessor patterns.
@@ -74,7 +74,7 @@ Update `src/db/schema.sql` to reflect the cumulative current state. Update `src/
 2. Make your change in a focused commit. Prefer multiple small commits over one large one if the change has logically separable parts.
 3. Update `CHANGELOG.md` under an `## [Unreleased]` heading. Use the same categories as previous entries (Added, Changed, Fixed, Removed, Deprecated, Security).
 4. Update relevant docs in `docs/` if you change behavior.
-5. Run `npm run deploy` against a staging environment if your change affects the deploy or scheduled handler.
+5. Run `bun run deploy` against a staging environment if your change affects the deploy or scheduled handler.
 6. Open a pull request using the template. Link any related issues.
 7. The CI workflow must pass. A maintainer will review.
 
