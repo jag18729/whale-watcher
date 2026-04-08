@@ -37,7 +37,7 @@
     "url": "https://github.com/jag18729/whale-watcher/issues"
   },
   "dependencies": {
-    "hono": "^4.0.0"
+    "hono": "^4.12.12"
   },
   "devDependencies": {
     "wrangler": "^4.0.0"
