@@ -12,6 +12,13 @@ routes = [
   { pattern = "ww.vandine.us/*", zone_name = "vandine.us" }
 ]
 
+# 06:00 PT (DST-aware) ~= 13:00 UTC during PDT, 14:00 UTC during PST.
+# Cloudflare cron triggers run in UTC. Schedule both so the brief lands at
+# 06:00 local year-round; the Worker idempotently overwrites the day's brief
+# in D1, so a duplicate run just refreshes the same row.
+[env.production.triggers]
+crons = ["0 13 * * 1-5", "0 14 * * 1-5"]
+
 [[env.production.d1_databases]]
 binding = "DB"
 database_name = "network-metrics"

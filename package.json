@@ -1,15 +1,41 @@
 {
   "name": "whale-watcher-dashboard",
-  "version": "1.0.0",
-  "description": "Live market intelligence dashboard for Whale Watcher trading community",
+  "version": "2.0.0",
+  "description": "Personalized morning brief newsletter for self-directed investors. Cloudflare Workers + D1 + Resend.",
   "main": "src/worker.js",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "wrangler dev",
-    "deploy": "wrangler deploy",
-    "deploy:prod": "wrangler deploy --env production"
+    "deploy": "wrangler deploy --env production",
+    "deploy:dry": "wrangler deploy --dry-run --env production --outdir /tmp/dry-run",
+    "tail": "wrangler tail --env production",
+    "schema:apply": "wrangler d1 execute whale-watcher --remote --file=src/db/schema.sql",
+    "schema:local": "wrangler d1 execute whale-watcher --local --file=src/db/schema.sql",
+    "check": "node --check src/worker.js"
   },
+  "keywords": [
+    "cloudflare-workers",
+    "cloudflare-d1",
+    "hono",
+    "newsletter",
+    "stock-market",
+    "resend",
+    "edge-computing",
+    "serverless"
+  ],
   "author": "Rafael Garcia",
   "license": "MIT",
+  "homepage": "https://github.com/jag18729/whale-watcher-dashboard#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jag18729/whale-watcher-dashboard.git"
+  },
+  "bugs": {
+    "url": "https://github.com/jag18729/whale-watcher-dashboard/issues"
+  },
   "dependencies": {
     "hono": "^4.0.0"
   },

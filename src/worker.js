@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { dashboardPage } from './routes/dashboard.js';
-import api from './routes/api.js';
+import api, { runMorningBrief } from './routes/api.js';
 import brief from './routes/brief.js';
 import webhooks from './routes/webhooks.js';
 
@@ -23,4 +23,18 @@ app.get('/dashboard', (c) => dashboardPage(c.env));
 // Fallback
 app.all('*', (c) => c.json({ error: 'Not found' }, 404));
 
-export default app;
+export default {
+  fetch: app.fetch,
+  // Cloudflare Workers cron trigger. Configured in wrangler.toml under [[triggers]].
+  // Runs the morning brief without involving any external scheduler or LLM agent.
+  async scheduled(event, env, ctx) {
+    const date = new Date().toISOString().slice(0, 10);
+    console.log(`[cron] run-morning-brief start date=${date} cron=${event.cron}`);
+    try {
+      const result = await runMorningBrief(env, date);
+      console.log(`[cron] run-morning-brief done sent=${result.results?.length ?? 0}`);
+    } catch (err) {
+      console.error(`[cron] run-morning-brief failed:`, err.stack || err.message);
+    }
+  },
+};

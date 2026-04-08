@@ -2,7 +2,7 @@
 
 export function apiKeyAuth() {
   return async (c, next) => {
-    const key = c.req.header('X-API-Key');
+    const key = c.req.header('X-API-Key') || c.req.query('key');
     if (!key || key !== c.env.AGENT_API_KEY) {
       return c.json({ error: 'Unauthorized' }, 401);
     }
