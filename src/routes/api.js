@@ -67,8 +67,34 @@ api.post('/pod', async (c) => {
     return c.json({ error: 'Required: ticker, action (add/remove)' }, 400);
   }
 
-  const id = await submitPodRequest(c.env.DB, user.id, ticker, action);
-  return c.json({ request_id: id, ticker: ticker.toUpperCase(), action });
+  const upper = ticker.toUpperCase();
+
+  // Apply immediately to pod_tickers so the user sees the change on next page load.
+  if (action === 'add') {
+    // Check if a soft-deleted row already exists for this ticker.
+    const existing = await c.env.DB.prepare(
+      'SELECT id FROM pod_tickers WHERE user_id = ? AND ticker = ?'
+    ).bind(user.id, upper).first();
+    if (existing) {
+      // Re-activate the soft-deleted row.
+      await c.env.DB.prepare(
+        'UPDATE pod_tickers SET removed_at = NULL WHERE user_id = ? AND ticker = ?'
+      ).bind(user.id, upper).run();
+    } else {
+      const id = crypto.randomUUID();
+      await c.env.DB.prepare(
+        'INSERT INTO pod_tickers (id, user_id, ticker, sector) VALUES (?, ?, ?, ?)'
+      ).bind(id, user.id, upper, null).run();
+    }
+  } else {
+    await c.env.DB.prepare(
+      "UPDATE pod_tickers SET removed_at = datetime('now') WHERE user_id = ? AND ticker = ? AND removed_at IS NULL"
+    ).bind(user.id, upper).run();
+  }
+
+  // Also record in pod_requests for audit trail.
+  const reqId = await submitPodRequest(c.env.DB, user.id, upper, action);
+  return c.json({ request_id: reqId, ticker: upper, action, applied: true });
 });
 
 api.get('/pod', async (c) => {

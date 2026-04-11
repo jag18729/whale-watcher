@@ -679,6 +679,8 @@ export function renderBriefPage({ user, briefDate, brief, pod }) {
 
       async function podAction(ticker, action) {
         if (!ticker) return;
+        ticker = ticker.trim().toUpperCase();
+        if (!ticker) return;
         try {
           var res = await fetch('/api/pod?t=' + encodeURIComponent(TOKEN), {
             method: 'POST',
@@ -687,10 +689,25 @@ export function renderBriefPage({ user, briefDate, brief, pod }) {
           });
           var data = await res.json();
           if (res.ok) {
-            flash(action === 'add' ? ticker.toUpperCase() + ' requested' : ticker + ' removal requested', 'ok');
-            if (action === 'add') {
+            flash(action === 'add' ? ticker + ' added to pod' : ticker + ' removed from pod', 'ok');
+            var tags = document.getElementById('pod-tags');
+            if (action === 'add' && tags) {
+              // Insert the new tag into the DOM immediately.
+              var span = document.createElement('span');
+              span.className = 'ww-tag';
+              span.innerHTML = '<span>' + ticker + '</span>' +
+                '<button type="button" class="ww-tag__close" data-action="pod-remove" data-ticker="' + ticker + '" aria-label="Remove ' + ticker + '">&times;</button>';
+              tags.appendChild(span);
               var input = document.getElementById('add-ticker');
               if (input) input.value = '';
+            }
+            if (action === 'remove' && tags) {
+              // Remove the tag from the DOM immediately.
+              var btn = tags.querySelector('[data-ticker="' + ticker + '"]');
+              if (btn) {
+                var tag = btn.closest('.ww-tag');
+                if (tag) tag.remove();
+              }
             }
           } else {
             flash(data.error || 'error', 'warn');
