@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - 2026-04-11
+
+### Added
+- Public portfolio landing page at `/` with editorial plates layout: product overview, tech stack badges, specimen brief preview (synthetic data), and links to GitHub/docs/API/changelog. Open Graph meta tags for social sharing.
+- Token-gated personal dashboard at `/dashboard` with server-side price fetching via `fetchYahooPrice`, pod tickers grouped by sector with live prices, recent dispatches list (last 7 briefs), and inline pod management.
+- `getRecentBriefs(db, userId, limit)` query in `src/db/queries.js` for the dashboard's dispatch history.
+- Mermaid diagrams throughout README and docs/ARCHITECTURE.md: system flowchart (color-coded by pipeline stage), morning brief sequence diagram, D1 schema ER diagram, Worker component map.
+
+### Changed
+- Email template (`src/templates/brief-email.js`) retrofitted to bathythermograph editorial palette via shared `tokens.js` constants. Georgia serif replaces system sans-serif. Whale spotlight on abyss background instead of light blue. Section labels use tracked editorial small-caps. CTA button in abyss instead of blue. Whale emoji replaced with sonar glyph `)))`.
+- `GET /` now serves the public landing instead of the old Tailwind/Finnhub dashboard.
+- `GET /dashboard` now requires a user token and shows the personal pod station log. Returns 401 without a token.
+- `src/worker.js` routing updated: landing.js for `/`, dashboard.js for `/dashboard`.
+- README rewritten to match the guard-quote style (concise tables, live links, badges, Mermaid architecture diagram).
+- Pod management section in ARCHITECTURE.md updated to reflect immediate-apply semantics.
+
+### Fixed
+- Old dashboard's hardcoded sector watchlists removed; the personal dashboard shows the user's actual pod from D1.
+
 ## [2.1.0] - 2026-04-11
 
 ### Added
@@ -70,6 +89,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Resend webhook ingestion for delivery, open, and click events.
 - Finnhub-powered market dashboard at `/`.
 
+[2.2.0]: https://github.com/jag18729/whale-watcher/releases/tag/v2.2.0
 [2.1.0]: https://github.com/jag18729/whale-watcher/releases/tag/v2.1.0
 [2.0.0]: https://github.com/jag18729/whale-watcher/releases/tag/v2.0.0
 [1.0.0]: https://github.com/jag18729/whale-watcher/releases/tag/v1.0.0
