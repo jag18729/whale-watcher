@@ -574,11 +574,6 @@ export function renderBriefPage({ user, briefDate, brief, pod }) {
         }
       });
 
-      // Prevent label clicks inside the drawer from bubbling up to the row head.
-      document.addEventListener('click', function (e) {
-        if (e.target.closest('.ww-controls')) e.stopPropagation();
-      }, true);
-
       // Track field input changes for the dirty count.
       document.addEventListener('input', function (e) {
         if (e.target.matches('[data-field][data-watch]')) {
