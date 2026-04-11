@@ -1,130 +1,282 @@
-// Extracted dashboard page - market viewer.
-// Quotes are fetched from /api/quotes (server-side proxy over Yahoo Finance) so no
-// upstream API key is exposed to the browser.
+// Personal pod dashboard at GET /dashboard?t=<token>
+// Token-required. Shows the user's actual pod with live prices, recent briefs,
+// and pod management. All data is fetched server-side via the shared
+// fetchYahooPrice helper -- no client-side API calls, no exposed keys.
 
-export function dashboardPage(env) {
+import { baseStyles } from '../templates/base-styles.js';
+import { resolveUserToken } from '../middleware/auth.js';
+import { getUserPod, getRecentBriefs } from '../db/queries.js';
+import { fetchYahooPrice } from './api.js';
+
+function escapeText(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+}
+function escapeAttr(s) { return escapeText(s); }
+
+function fmtPrice(p) {
+  if (p == null) return '--';
+  const n = Number(p);
+  if (!Number.isFinite(n)) return '--';
+  return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+export async function dashboardPage(c) {
+  c.header('Referrer-Policy', 'no-referrer');
+  c.header('X-Content-Type-Options', 'nosniff');
+  c.header('X-Frame-Options', 'DENY');
+
+  const user = await resolveUserToken(c);
+  if (!user) {
+    return c.html(`<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="referrer" content="no-referrer"><title>Whale Watcher</title>${baseStyles()}
+<style>.ww-gate{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;text-align:center;gap:1.5rem}</style>
+</head><body><div class="ww-page"><div class="ww-gate">
+<h1 class="ww-display" style="font-size:clamp(2rem,6vw,3rem)">Station log</h1>
+<p class="ww-body" style="color:color-mix(in srgb,var(--ink) 60%,transparent)">This view is private. If you have a link in your inbox, follow it.</p>
+<a href="/" class="ww-button">Back to landing</a>
+</div></div></body></html>`, 401);
+  }
+
+  // Fetch pod, prices, and recent briefs in parallel.
+  const pod = await getUserPod(c.env.DB, user.id);
+  const tickers = pod.map(p => p.ticker);
+
+  const [priceResults, recentBriefs] = await Promise.all([
+    Promise.all(tickers.map(fetchYahooPrice)),
+    getRecentBriefs(c.env.DB, user.id, 7),
+  ]);
+
+  const prices = {};
+  for (const r of priceResults) prices[r.ticker] = r;
+
+  const today = new Date().toISOString().slice(0, 10);
+  const dateObj = new Date();
+  const months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+  const dateLabel = `${String(dateObj.getUTCDate()).padStart(2,'0')} ${months[dateObj.getUTCMonth()]} ${dateObj.getUTCFullYear()}`;
+
+  // Group tickers by sector for layout (null sector goes to "other")
+  const sectors = {};
+  for (const p of pod) {
+    const sec = p.sector || 'other';
+    if (!sectors[sec]) sectors[sec] = [];
+    sectors[sec].push(p.ticker);
+  }
+
+  const tickerRow = (t) => {
+    const px = prices[t] || {};
+    const price = px.price;
+    const change = px.change_pct;
+    const colorVar = change == null ? '--tide' : (change >= 0 ? '--kelp' : '--rust');
+    const sign = change != null && change >= 0 ? '+' : '';
+    return `
+      <div class="ww-dash-row ww-tide-in">
+        <span class="ww-mono ww-dash-row__ticker">${escapeText(t)}</span>
+        <span class="ww-mono ww-dash-row__price">${price != null ? '$' + fmtPrice(price) : '--'}</span>
+        <span class="ww-mono ww-dash-row__change" style="color:var(${colorVar})">${change != null ? sign + change.toFixed(2) + '%' : ''}</span>
+      </div>`;
+  };
+
+  const sectorBlock = (name, tickers) => `
+    <div class="ww-dash-sector">
+      <div class="ww-caption">${escapeText(name)}</div>
+      <div class="ww-dash-sector__list">
+        ${tickers.map(tickerRow).join('')}
+      </div>
+    </div>`;
+
+  const briefLink = (b) => `
+    <li class="ww-dash-brief">
+      <a href="/brief/${escapeAttr(b.brief_date)}?t=${encodeURIComponent(user.token)}" class="ww-dash-brief__link">
+        <span class="ww-mono ww-dash-brief__date">${escapeText(b.brief_date)}</span>
+        <span class="ww-dash-brief__subject">${escapeText(b.subject)}</span>
+      </a>
+    </li>`;
+
+  const podTag = (p) => `
+    <span class="ww-tag">
+      <span>${escapeText(p.ticker)}</span>
+      <button type="button" class="ww-tag__close" data-action="pod-remove" data-ticker="${escapeAttr(p.ticker)}" aria-label="Remove ${escapeAttr(p.ticker)}">&times;</button>
+    </span>`;
+
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Whale Watcher</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <meta name="referrer" content="no-referrer">
+  <meta name="color-scheme" content="light">
+  <title>Station Log &middot; ${escapeText(user.name)}</title>
+  ${baseStyles()}
   <style>
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
-    .fade-in { animation: fadeIn 0.3s ease-out; }
-    .spin { animation: spin 1s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
+    .ww-dash-row {
+      display: grid;
+      grid-template-columns: 5rem 1fr auto;
+      gap: 0.5rem;
+      align-items: baseline;
+      padding: 0.7rem 0.25rem;
+      border-bottom: var(--rule);
+    }
+    .ww-dash-row__ticker { font-weight: 600; font-size: 1rem; }
+    .ww-dash-row__price { font-size: 0.95rem; text-align: right; color: var(--ink); }
+    .ww-dash-row__change { font-size: 0.88rem; text-align: right; min-width: 5rem; }
+
+    .ww-dash-sector { margin-bottom: 2rem; }
+    .ww-dash-sector__list { border-top: var(--rule-strong); }
+    .ww-dash-sectors {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+      gap: 1.5rem 2.5rem;
+    }
+
+    .ww-dash-brief { list-style: none; }
+    .ww-dash-brief__link {
+      display: flex;
+      gap: 1.25rem;
+      align-items: baseline;
+      padding: 0.65rem 0;
+      border-bottom: var(--rule);
+      text-decoration: none;
+      color: inherit;
+      transition: background 180ms;
+    }
+    .ww-dash-brief__link:hover { background: color-mix(in srgb, var(--tide) 5%, transparent); }
+    .ww-dash-brief__date { font-size: 0.85rem; color: var(--tide); white-space: nowrap; }
+    .ww-dash-brief__subject {
+      font-family: var(--font-display);
+      font-weight: 500;
+      font-size: 0.95rem;
+      color: var(--ink);
+    }
   </style>
 </head>
-<body class="bg-gray-900 text-white min-h-screen">
-  <header class="bg-gray-800 border-b border-gray-700 p-4 sticky top-0 z-50">
-    <div class="max-w-7xl mx-auto flex justify-between items-center">
-      <div class="flex items-center space-x-4">
-        <h1 class="text-3xl font-bold">Whale Watcher</h1>
-        <div class="flex items-center space-x-2">
-          <div class="w-2 h-2 bg-gray-500 rounded-full" id="status-dot"></div>
-          <span class="text-sm text-gray-400" id="status-text">Ready</span>
-        </div>
+<body>
+  <div class="ww-page">
+
+    <header class="ww-masthead">
+      <span class="ww-caption">${escapeText(dateLabel)} &middot; ${escapeText(user.name.toUpperCase())}</span>
+      <h1 class="ww-display">STATION LOG</h1>
+    </header>
+    <hr class="ww-rule ww-rule--strong">
+
+    <!-- Today's pod with prices -->
+    <section class="ww-plate">
+      <div class="ww-plate__head">
+        <span class="ww-caption">PLATE I &middot; YOUR POD (${tickers.length} tickers)</span>
+        <a href="/brief/${today}?t=${encodeURIComponent(user.token)}" class="ww-button" style="padding:0.4rem 1rem;font-size:0.75rem">Today's brief</a>
       </div>
-      <div class="flex items-center space-x-4">
-        <div class="text-right">
-          <div class="text-sm text-gray-400" id="last-update">Not loaded</div>
-        </div>
-        <button onclick="loadAll()" id="refresh-btn"
-          class="bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center space-x-2">
-          <span id="refresh-icon">&#x1F504;</span>
-          <span id="refresh-label">Refresh</span>
-        </button>
-      </div>
-    </div>
-  </header>
-  <div class="max-w-7xl mx-auto p-6 space-y-8">
-    <section>
-      <h2 class="text-2xl font-bold mb-6 text-center">Market Overview</h2>
-      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4" id="market-overview">
-        <div class="bg-gray-800 rounded-lg p-4 border border-gray-700 text-center text-gray-500 text-sm">Press Refresh to load</div>
+      <div class="ww-dash-sectors">
+        ${Object.entries(sectors).map(([name, ts]) => sectorBlock(name, ts)).join('')}
       </div>
     </section>
-    <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <div class="bg-gray-800 rounded-lg p-5">
-        <h3 class="text-lg font-bold mb-4 text-blue-400">Tech</h3>
-        <div class="space-y-2" id="tech-list"><div class="text-sm text-gray-500 text-center py-4">&mdash;</div></div>
+
+    <div class="ww-isobath" aria-hidden="true"></div>
+
+    <!-- Recent briefs -->
+    ${recentBriefs.length ? `
+    <section class="ww-plate">
+      <div class="ww-plate__head">
+        <span class="ww-caption">PLATE II &middot; RECENT DISPATCHES</span>
       </div>
-      <div class="bg-gray-800 rounded-lg p-5">
-        <h3 class="text-lg font-bold mb-4 text-green-400">Energy</h3>
-        <div class="space-y-2" id="energy-list"><div class="text-sm text-gray-500 text-center py-4">&mdash;</div></div>
-      </div>
-      <div class="bg-gray-800 rounded-lg p-5">
-        <h3 class="text-lg font-bold mb-4 text-purple-400">Defense</h3>
-        <div class="space-y-2" id="defense-list"><div class="text-sm text-gray-500 text-center py-4">&mdash;</div></div>
-      </div>
+      <ul class="ww-links" style="margin:0;padding:0">
+        ${recentBriefs.map(briefLink).join('')}
+      </ul>
     </section>
-    <div class="text-center text-xs text-gray-500 pb-4">
-      <p>Not financial advice. DYOR.</p>
-      <p class="mt-1">Data: Yahoo Finance</p>
-    </div>
+    ` : ''}
+
+    <div class="ww-isobath" aria-hidden="true"></div>
+
+    <!-- Pod management -->
+    <section class="ww-plate">
+      <div class="ww-plate__head">
+        <span class="ww-caption">PLATE III &middot; POD COMPOSITION</span>
+      </div>
+      <div class="ww-pod-tags" id="pod-tags">
+        ${pod.map(podTag).join('')}
+      </div>
+      <div class="ww-pod-add">
+        <input id="add-ticker" class="ww-input" type="text" placeholder="add ticker..." maxlength="10" autocomplete="off">
+        <button id="pod-add-btn" class="ww-button" type="button">Add</button>
+      </div>
+      <span class="ww-flash" id="save-flash" data-tone="" role="status" aria-live="polite" style="display:block;margin-top:0.75rem"></span>
+    </section>
+
+    <footer class="ww-footer">
+      <a href="/" style="color:var(--tide);text-decoration:underline;text-underline-offset:3px;font-family:var(--font-display);font-weight:500">Back to landing</a>
+      <p class="ww-disclaimer" style="margin-top:0.75rem">Not financial advice. Do your own research.</p>
+    </footer>
+
   </div>
+
   <script>
-    let isLoading = false;
-    const WATCHLISTS = {
-      market: ['SPY','QQQ','DIA','IWM'],
-      tech: ['AAPL','MSFT','GOOGL','META','NVDA','TSLA','PLTR'],
-      energy: ['XOM','CVX','OXY','XLE','USO'],
-      defense: ['LMT','RTX','NOC','GD','LHX']
-    };
-    function stockCard(sym, data) {
-      const c = data.c || 0, d = data.d || 0, dp = data.dp || 0;
-      const up = d >= 0, color = up ? 'text-green-400' : 'text-red-400';
-      const border = up ? 'border-green-500/30' : 'border-red-500/30', sign = up ? '+' : '';
-      return '<div class="bg-gray-800 rounded-lg p-4 border ' + border + ' fade-in"><div class="text-xs text-gray-400 mb-1">' + sym + '</div><div class="text-xl font-bold">$' + c.toFixed(2) + '</div><div class="text-sm ' + color + '">' + sign + d.toFixed(2) + ' (' + sign + dp.toFixed(2) + '%)</div></div>';
-    }
-    function stockRow(sym, data) {
-      const c = data.c || 0, d = data.d || 0, dp = data.dp || 0;
-      const up = d >= 0, color = up ? 'text-green-400' : 'text-red-400', sign = up ? '+' : '';
-      return '<div class="flex justify-between items-center py-2 border-b border-gray-700/50 fade-in"><span class="font-mono font-bold text-sm">' + sym + '</span><div class="text-right"><div class="text-sm font-bold">$' + c.toFixed(2) + '</div><div class="text-xs ' + color + '">' + sign + dp.toFixed(2) + '%</div></div></div>';
-    }
-    async function fetchQuotes(syms) {
-      try {
-        const r = await fetch('/api/quotes?symbols=' + encodeURIComponent(syms.join(',')));
-        if (!r.ok) return {};
-        const j = await r.json();
-        return j.quotes || {};
-      } catch { return {}; }
-    }
-    async function loadAll() {
-      if (isLoading) return; isLoading = true;
-      const dot = document.getElementById('status-dot'), txt = document.getElementById('status-text');
-      const btn = document.getElementById('refresh-btn'), icon = document.getElementById('refresh-icon'), label = document.getElementById('refresh-label');
-      btn.disabled = true; btn.className = 'bg-gray-600 text-gray-300 px-4 py-2 rounded-lg text-sm font-medium flex items-center space-x-2 cursor-wait';
-      icon.innerHTML = '<svg class="w-4 h-4 spin inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 11-6.22-8.56"/></svg>';
-      label.textContent = 'Loading...'; dot.className = 'w-2 h-2 bg-yellow-500 rounded-full animate-pulse';
-      txt.textContent = 'Updating...'; txt.className = 'text-sm text-yellow-400';
-      try {
-        const allSyms = [...new Set([...WATCHLISTS.market, ...WATCHLISTS.tech, ...WATCHLISTS.energy, ...WATCHLISTS.defense])];
-        const results = await fetchQuotes(allSyms);
-        const safe = sym => results[sym] && results[sym].c != null;
-        document.getElementById('market-overview').innerHTML = WATCHLISTS.market.map(s => safe(s) ? stockCard(s, results[s]) : '').join('');
-        document.getElementById('tech-list').innerHTML = WATCHLISTS.tech.map(s => safe(s) ? stockRow(s, results[s]) : '').join('');
-        document.getElementById('energy-list').innerHTML = WATCHLISTS.energy.map(s => safe(s) ? stockRow(s, results[s]) : '').join('');
-        document.getElementById('defense-list').innerHTML = WATCHLISTS.defense.map(s => safe(s) ? stockRow(s, results[s]) : '').join('');
-        dot.className = 'w-2 h-2 bg-green-500 rounded-full'; txt.textContent = 'Updated'; txt.className = 'text-sm text-green-400';
-        document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
-      } catch (e) { dot.className = 'w-2 h-2 bg-red-500 rounded-full'; txt.textContent = 'Error'; txt.className = 'text-sm text-red-400'; }
-      btn.disabled = false; btn.className = 'bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center space-x-2';
-      icon.textContent = '\\u{1F504}'; label.textContent = 'Refresh'; isLoading = false;
-    }
+    (function () {
+      var TOKEN = new URLSearchParams(location.search).get('t') || '';
+      var flashTimer = null;
+      function flash(msg, tone) {
+        var el = document.getElementById('save-flash');
+        if (!el) return;
+        el.textContent = msg; el.dataset.tone = tone || '';
+        el.dataset.fading = 'false';
+        clearTimeout(flashTimer);
+        flashTimer = setTimeout(function () {
+          el.dataset.fading = 'true';
+          setTimeout(function () { el.textContent = ''; el.dataset.tone = ''; el.dataset.fading = 'false'; }, 400);
+        }, 5000);
+      }
+
+      document.addEventListener('click', function (e) {
+        var btn = e.target.closest('[data-action]');
+        if (btn && btn.dataset.action === 'pod-remove') {
+          e.preventDefault();
+          podAction(btn.dataset.ticker, 'remove');
+          return;
+        }
+        if (e.target.id === 'pod-add-btn') {
+          podAction(document.getElementById('add-ticker').value, 'add');
+        }
+      });
+
+      document.addEventListener('keydown', function (e) {
+        if (e.target && e.target.id === 'add-ticker' && e.key === 'Enter') {
+          e.preventDefault();
+          podAction(e.target.value, 'add');
+        }
+      });
+
+      async function podAction(ticker, action) {
+        if (!ticker) return;
+        ticker = ticker.trim().toUpperCase();
+        if (!ticker) return;
+        try {
+          var res = await fetch('/api/pod?t=' + encodeURIComponent(TOKEN), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ticker: ticker, action: action }),
+          });
+          var data = await res.json();
+          if (res.ok) {
+            flash(action === 'add' ? ticker + ' added to pod' : ticker + ' removed from pod', 'ok');
+            var tags = document.getElementById('pod-tags');
+            if (action === 'add' && tags) {
+              var span = document.createElement('span');
+              span.className = 'ww-tag';
+              span.innerHTML = '<span>' + ticker + '</span><button type="button" class="ww-tag__close" data-action="pod-remove" data-ticker="' + ticker + '" aria-label="Remove ' + ticker + '">&times;</button>';
+              tags.appendChild(span);
+              document.getElementById('add-ticker').value = '';
+            }
+            if (action === 'remove' && tags) {
+              var b = tags.querySelector('[data-ticker="' + ticker + '"]');
+              if (b) { var t = b.closest('.ww-tag'); if (t) t.remove(); }
+            }
+          } else {
+            flash(data.error || 'error', 'warn');
+          }
+        } catch (err) { flash('network error', 'warn'); }
+      }
+    })();
   </script>
 </body>
 </html>`;
 
-  return new Response(html, {
-    headers: {
-      'Content-Type': 'text/html;charset=UTF-8',
-      'Cache-Control': 'no-cache',
-      'X-Content-Type-Options': 'nosniff',
-      'X-Frame-Options': 'DENY',
-      'Referrer-Policy': 'no-referrer',
-    },
-  });
+  return c.html(html);
 }

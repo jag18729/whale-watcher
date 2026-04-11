@@ -52,6 +52,13 @@ export async function updateBriefResendId(db, briefId, resendId) {
   await db.prepare('UPDATE briefs SET resend_id = ? WHERE id = ?').bind(resendId, briefId).run();
 }
 
+export async function getRecentBriefs(db, userId, limit = 7) {
+  const rows = await db.prepare(
+    'SELECT brief_date, subject FROM briefs WHERE user_id = ? ORDER BY brief_date DESC LIMIT ?'
+  ).bind(userId, limit).all();
+  return rows.results;
+}
+
 export async function getBriefWithWatches(db, briefDate, userId) {
   const brief = await db.prepare(
     'SELECT * FROM briefs WHERE brief_date = ? AND user_id = ?'
