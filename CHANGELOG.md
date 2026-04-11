@@ -5,18 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.1.0] - 2026-04-11
+
+### Added
+- Bathythermograph editorial design system: `src/templates/tokens.js` (color, type, motion constants) and `src/templates/base-styles.js` (CSS variables, Fraunces + IBM Plex Mono via bunny.net, paper grain, chart grid, conviction gauge, sonar ping, tide-in stagger, editorial form controls).
+- Complete `/brief/:date` redesign with mobile-first plates layout, hero whale plate on inverted abyss section, expandable watch drawers, sticky submit bar, and per-user pod composition section.
+- HCI refinements: ARIA attributes (`aria-expanded`, `aria-controls`, `aria-live`, `role="status"`), skip-link, focus management on drawer open, tap confirmation pulse, flash auto-clear, 44px touch targets on pod tag close buttons.
+- `GET /api/quotes` public endpoint: server-side proxy over Yahoo Finance, no API key required, Finnhub-compatible response shape.
+- `POST /api/pod` now applies changes immediately to `pod_tickers` instead of only queuing a request. Handles add, remove, and re-add (soft-deleted rows are re-activated). Client-side DOM updates instantly after a successful action.
 
 ### Changed
-- Toolchain migrated from Node 20 + npm to Bun 1.3+. `package.json` now declares `engines.bun >=1.3` and `packageManager: bun@1.3.9`. Lockfile is `bun.lock` (text format, reviewable diffs).
-- GitHub Actions workflows use `oven-sh/setup-bun@v2` and `bun install --frozen-lockfile` instead of `actions/setup-node` and `npm ci`. The Cloudflare Wrangler action is invoked with `packageManager: bun`.
-- All documentation (README, CONTRIBUTING, docs/DEPLOY.md, src/db/migrations/README.md) updated to use `bun install`, `bun run`, and `bunx wrangler` instead of the npm equivalents.
-- The `check` script now runs `wrangler deploy --dry-run` (the canonical validator) instead of `node --check`, since Bun does not ship a Node-style file syntax check.
+- Toolchain migrated from Node 20 + npm to Bun 1.3+. `bun.lock` (text format) replaces `package-lock.json`. CI uses `oven-sh/setup-bun@v2`.
+- Finnhub API key removed from client-side JavaScript. The dashboard now calls `/api/quotes` instead of making direct Finnhub requests from the browser.
+- Agree/disagree button state managed by `data-state` attributes and CSS selectors instead of fragile regex-based className toggling.
+- All user-controlled values in the brief page pass through `escapeText`/`escapeAttr` helpers.
+- `Referrer-Policy: no-referrer`, `X-Frame-Options: DENY`, and `X-Content-Type-Options: nosniff` headers on all HTML responses.
+- Pod ticker interpolation uses `data-ticker` attributes with event delegation instead of inline `onclick` handlers.
+- Tailwind CDN dropped from the brief page (replaced by hand-written design system CSS).
+
+### Fixed
+- Agree/disagree buttons were blocked by a capturing-phase click listener that stopped propagation inside `.ww-controls` before the delegation handler could process the click.
+- `fetchYahooPrice` now returns absolute price change in addition to percent, used by the quotes proxy.
+- Pod re-add after a soft-delete (remove then add the same ticker) now correctly clears `removed_at` instead of silently failing on a UNIQUE constraint.
 
 ### Removed
-- `package-lock.json` (replaced by `bun.lock`).
-- `.nvmrc` (Bun is now the only required runtime tool).
-- `node` and `npm` references in CI and docs.
+- `package-lock.json` and `.nvmrc` (replaced by `bun.lock` and `packageManager` field).
 
 ## [2.0.0] - 2026-04-08
 
@@ -57,5 +70,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Resend webhook ingestion for delivery, open, and click events.
 - Finnhub-powered market dashboard at `/`.
 
+[2.1.0]: https://github.com/jag18729/whale-watcher/releases/tag/v2.1.0
 [2.0.0]: https://github.com/jag18729/whale-watcher/releases/tag/v2.0.0
 [1.0.0]: https://github.com/jag18729/whale-watcher/releases/tag/v1.0.0
