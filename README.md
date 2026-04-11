@@ -39,39 +39,49 @@ A single Cloudflare Worker that fetches market data, builds per-subscriber brief
 
 ## Architecture
 
-```
-Cloudflare cron trigger (06:00 PT, weekdays)
-                |
-                v
-    Worker scheduled() handler
-                |
-                v
-      runMorningBrief(env, today)
-                |
-    +-----------+-----------+
-    |           |           |
-    v           v           v
-Yahoo Finance  Brave     D1 read
- (prices)    (headlines) (users + pods)
-    |           |           |
-    +-----------+-----------+
-                |
-                v
-      auto-build brief JSON
-      whale = biggest absolute mover
-      conviction from |%change|
-                |
-                v
-      render HTML per user
-                |
-      +---------+---------+
-      |                   |
-      v                   v
-  Resend API         store in D1
-  (email sent)     (briefs + watches)
-```
+```mermaid
+flowchart TB
+    subgraph schedule [" "]
+        direction LR
+        cron["Cloudflare Cron<br/><code>0 13 * * 1-5</code> PDT<br/><code>0 14 * * 1-5</code> PST"]
+        manual["Manual trigger<br/><code>GET /api/run-morning-brief</code>"]
+    end
 
-The same `runMorningBrief` function backs `GET /api/run-morning-brief`, so manual triggers and the cron execute identical code paths.
+    cron & manual --> run["<b>runMorningBrief</b><br/><i>same code path</i>"]
+
+    run --> yahoo["Yahoo Finance<br/>prices for all pod tickers"]
+    run --> brave["Brave Search<br/>3 headline queries, paced 1.1s"]
+    run --> d1r[("D1 read<br/>users, pods, feedback")]
+
+    yahoo & brave --> cache[("D1 write<br/>research_cache")]
+    yahoo & brave & d1r --> build["Auto-build brief JSON<br/>whale = largest |%change|<br/>conviction from magnitude"]
+
+    build --> loop{{"For each subscriber"}}
+    loop --> render["Render HTML<br/>server-side template"]
+    render --> resend["Resend API<br/>email delivered"]
+    render --> d1w[("D1 write<br/>briefs + watches")]
+
+    resend --> inbox(["Subscriber inbox"])
+    inbox -. "Review & Tune link" .-> brief["Feedback page<br/><code>/brief/:date?t=token</code>"]
+    brief -. "agree, disagree, adjust" .-> d1f[("D1 write<br/>feedback + pod changes")]
+
+    style schedule fill:none,stroke:none
+    style cron fill:#0B1C24,color:#F2EDE2,stroke:#2B5F6B
+    style manual fill:#0B1C24,color:#F2EDE2,stroke:#2B5F6B
+    style run fill:#E6B422,color:#141414,stroke:#141414,stroke-width:2px
+    style yahoo fill:#2B5F6B,color:#F2EDE2,stroke:#2B5F6B
+    style brave fill:#2B5F6B,color:#F2EDE2,stroke:#2B5F6B
+    style build fill:#F2EDE2,color:#141414,stroke:#2B5F6B
+    style render fill:#F2EDE2,color:#141414,stroke:#2B5F6B
+    style resend fill:#6B7A3A,color:#F2EDE2,stroke:#6B7A3A
+    style inbox fill:#6B7A3A,color:#F2EDE2,stroke:#6B7A3A
+    style brief fill:#F2EDE2,color:#141414,stroke:#B8451F,stroke-width:2px
+    style d1r fill:#0B1C24,color:#F2EDE2,stroke:#2B5F6B
+    style d1w fill:#0B1C24,color:#F2EDE2,stroke:#2B5F6B
+    style d1f fill:#0B1C24,color:#F2EDE2,stroke:#2B5F6B
+    style cache fill:#0B1C24,color:#F2EDE2,stroke:#2B5F6B
+    style loop fill:#E6B422,color:#141414,stroke:#141414
+```
 
 ---
 
