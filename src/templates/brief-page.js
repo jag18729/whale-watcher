@@ -85,7 +85,7 @@ function watchRow(w, idx) {
   const stagger = `style="animation-delay: ${(idx * 60)}ms"`;
   return `
     <article class="ww-watch ww-tide-in" data-watch-id="${escapeAttr(w.id)}" data-expanded="false" ${stagger}>
-      <button type="button" class="ww-watch__head" data-action="toggle-drawer">
+      <button type="button" class="ww-watch__head" data-action="toggle-drawer" aria-expanded="false" aria-controls="drawer-${escapeAttr(w.id)}" aria-label="${escapeAttr(w.ticker)} -- tap to expand details">
         <span class="ww-watch__ticker ww-mono">${escapeText(w.ticker)}</span>
         <span class="ww-watch__center">
           <span class="ww-direction ww-direction--${direction}">${direction}</span>
@@ -94,9 +94,9 @@ function watchRow(w, idx) {
         <span class="ww-watch__price ww-mono">
           ${w.entry_price != null ? '$' + fmtPrice(w.entry_price) : ''}
         </span>
-        <span class="ww-watch__chev" aria-hidden="true">+</span>
+        <span class="ww-watch__chev" aria-hidden="true">&#x25BE;</span>
       </button>
-      <div class="ww-drawer">
+      <div class="ww-drawer" id="drawer-${escapeAttr(w.id)}" role="region" aria-label="${escapeAttr(w.ticker)} details">
         ${w.thesis ? `<p class="ww-body ww-drawer__thesis">${escapeText(w.thesis)}</p>` : ''}
         <div class="ww-readout">
           <div class="ww-readout__cell"><div class="ww-caption">entry</div><div class="ww-readout__val ww-mono">${w.entry_price != null ? '$' + fmtPrice(w.entry_price) : '--'}</div></div>
@@ -350,15 +350,63 @@ export function renderBriefPage({ user, briefDate, brief, pod }) {
       justify-content: space-between;
       gap: 1rem;
     }
+
+    /* ===== HCI: tap confirmation pulse on agree/disagree ===== */
+    @keyframes ww-tap-pulse {
+      0%   { transform: scale(1); }
+      40%  { transform: scale(1.06); }
+      100% { transform: scale(1); }
+    }
+    .ww-button[data-val][data-state="on"] {
+      animation: ww-tap-pulse 200ms cubic-bezier(0.2, 0.7, 0.2, 1);
+    }
+
+    /* ===== HCI: flash message fade-out ===== */
+    .ww-flash {
+      transition: opacity 400ms ease;
+    }
+    .ww-flash[data-fading="true"] {
+      opacity: 0;
+    }
+
+    /* ===== HCI: chevron rotation on expand (down -> up) ===== */
+    .ww-watch[data-expanded="true"] .ww-watch__chev {
+      transform: rotate(180deg);
+    }
+
+    /* ===== HCI: skip-link for keyboard users ===== */
+    .ww-skip {
+      position: absolute;
+      left: -9999px;
+      top: auto;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      z-index: 100;
+    }
+    .ww-skip:focus {
+      position: fixed;
+      top: 0.75rem;
+      left: 0.75rem;
+      width: auto;
+      height: auto;
+      padding: 0.7rem 1.2rem;
+      background: var(--ink);
+      color: var(--paper);
+      font-family: var(--font-display);
+      font-size: 0.95rem;
+      z-index: 1000;
+    }
   </style>
 </head>
 <body>
+  <a href="#watches" class="ww-skip">Skip to watches</a>
   <div class="ww-page">
 
     <header class="ww-masthead">
       <div class="ww-masthead__row">
         <span class="ww-caption">${escapeText(dateLabel)} &middot; dispatch for ${escapeText(userLabel)}</span>
-        <span class="ww-flash" id="save-flash" data-tone=""></span>
+        <span class="ww-flash" id="save-flash" data-tone="" role="status" aria-live="polite"></span>
       </div>
       <h1 class="ww-display">WHALE WATCHER</h1>
     </header>
@@ -401,7 +449,7 @@ export function renderBriefPage({ user, briefDate, brief, pod }) {
 
   </div>
 
-  <div class="ww-submit-bar" id="submit-bar" data-active="false">
+  <div class="ww-submit-bar" id="submit-bar" data-active="false" aria-live="polite">
     <span class="ww-submit-bar__count" id="submit-count">no changes pending</span>
     <button class="ww-button ww-button--primary" id="submit-btn" type="button">Submit feedback</button>
   </div>
@@ -416,11 +464,23 @@ export function renderBriefPage({ user, briefDate, brief, pod }) {
         agreements[btn.dataset.watch] = btn.dataset.val;
       });
 
+      var flashTimer = null;
       function flash(msg, tone) {
         var el = document.getElementById('save-flash');
         if (!el) return;
         el.textContent = msg;
         el.dataset.tone = tone || '';
+        el.dataset.fading = 'false';
+        // Auto-clear after 5 seconds so stale messages don't persist.
+        clearTimeout(flashTimer);
+        flashTimer = setTimeout(function () {
+          el.dataset.fading = 'true';
+          setTimeout(function () {
+            el.textContent = '';
+            el.dataset.tone = '';
+            el.dataset.fading = 'false';
+          }, 400);
+        }, 5000);
       }
 
       function setAgreement(watchId, val) {
@@ -446,7 +506,17 @@ export function renderBriefPage({ user, briefDate, brief, pod }) {
 
       function toggleDrawer(watchEl) {
         var open = watchEl.dataset.expanded === 'true';
-        watchEl.dataset.expanded = open ? 'false' : 'true';
+        var next = open ? 'false' : 'true';
+        watchEl.dataset.expanded = next;
+        // Sync aria-expanded on the toggle button for screen readers.
+        var btn = watchEl.querySelector('[data-action="toggle-drawer"]');
+        if (btn) btn.setAttribute('aria-expanded', next);
+        // On open, focus the first interactive element in the drawer so
+        // keyboard users land inside it without extra Tab presses.
+        if (next === 'true') {
+          var first = watchEl.querySelector('.ww-drawer .ww-button, .ww-drawer .ww-input');
+          if (first) setTimeout(function () { first.focus(); }, 100);
+        }
       }
 
       function isFieldDirty(input) {

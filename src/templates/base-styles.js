@@ -297,9 +297,14 @@ export function baseStyles() {
   }
   .ww-tag__close {
     background: none; border: none; cursor: pointer;
-    color: var(--tide); font-size: 1.1rem; line-height: 1; padding: 0;
+    color: var(--tide); font-size: 1.1rem; line-height: 1;
+    /* Fitts' law: expand touch target to 44x44 minimum */
+    padding: 0.5rem;
+    margin: -0.5rem -0.25rem -0.5rem 0;
+    -webkit-tap-highlight-color: transparent;
   }
   .ww-tag__close:hover { color: var(--rust); }
+  .ww-tag__close:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
 
   /* ==========  Sticky bottom submit bar (mobile)  ========== */
   .ww-submit-bar {
